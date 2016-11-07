@@ -53,7 +53,10 @@ getArrivalTime =
 timeDecoder : Json.Decoder Int
 timeDecoder =
     Json.list ("timeToStation" := Json.int)
-        `Json.andThen` (\l -> l |> List.head |> (Maybe.withDefault 0) |> Json.succeed)
+        `Json.andThen` (\l -> l
+            |> List.head
+            |> (Maybe.withDefault 0)
+            |> (\s -> Json.succeed (s // 60)))
 
 main =
     Html.program
