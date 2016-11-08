@@ -5,14 +5,16 @@ import Html.App as Html
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Json.Decode as Json exposing ((:=))
-import Http exposing (get)
+import Http exposing (Error(BadResponse, NetworkError, Timeout, UnexpectedPayload), get)
 import Task
 import String exposing (join, padLeft)
+import Time exposing (every, second)
 
 
 type alias Model =
     { times : List Int
-    , loading: Bool }
+    , loading: Bool
+    , error: Maybe String }
 
 
 type Msg
@@ -23,12 +25,12 @@ type Msg
 
 init : ( Model, Cmd Msg )
 init =
-    ( Model [] True, getArrivalTime )
+    ( Model [] True Nothing, getArrivalTime )
 
 pad =
     toString >> padLeft 2 '0'
 
-secondsToMinutes t =
+timeToBus t =
     let
         m =
             t // 60 |> pad
@@ -36,31 +38,26 @@ secondsToMinutes t =
         s =
             rem t 60 |> pad
     in
-        m ++ "m:" ++ s ++ "s"
+        div
+            [ class "minutes" ]
+            [ text (m ++ "m:" ++ s ++ "s") ]
 
 
 view : Model -> Html Msg
 view model =
-    let
-        ts =
-            model.times
-                |> List.map secondsToMinutes
-    in
-        div [ class "container" ]
-            [ div []
-                (List.map
-                    (\t ->
-                        div [ class "minutes" ] [ text t ]
-                    )
-                    ts
-                )
-            , div
-                [ class "refresh"
-                , disabled model.loading ]
-                [ button [ onClick Refresh ]
-                    [ text (if model.loading then "Loading..." else "Refresh") ]
-                ]
+    div [ class "container" ]
+        [ div []
+            (List.map timeToBus model.times )
+        , div
+            [ class "refresh"
+            , disabled model.loading ]
+            [ button [ onClick Refresh ]
+                [ text (if model.loading then "Loading..." else "Refresh") ]
             ]
+        , div
+            [ class "error" ]
+            [ text (Maybe.withDefault "" model.error) ]
+        ]
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -68,10 +65,20 @@ update msg model =
     case msg of
         ResultSuccess times ->
             ( { model | times = times |> List.sort
-            , loading = False }, Cmd.none )
+            , loading = False
+            , error = Nothing }, Cmd.none )
 
         ResultFailed err ->
-            ( { model | loading = False }, Cmd.none )
+            let
+                errStr =
+                    case err of
+                        Timeout -> "The service timed out"
+                        NetworkError -> "There was some sort of network error"
+                        UnexpectedPayload s -> "There was an unexpected payload of: " ++ s
+                        BadResponse code msg -> "We received a bad response of " ++ (toString code) ++ " from the server with the message: " ++ msg
+            in
+            ( { model | loading = False
+             , error = errStr |> Just }, Cmd.none )
 
         Refresh ->
             ( { model | loading = True }, getArrivalTime )
