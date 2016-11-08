@@ -15,7 +15,15 @@ body {
 }
 
 .refresh button {
+    margin:20px;
     padding:10px;
     text-align: center;
     cursor: pointer;
+    font-size:2em;
+}
+
+.error {
+    font-size:0.8em;
+    color:#aaa;
+    margin:20px;
 }
