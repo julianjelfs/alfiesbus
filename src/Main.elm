@@ -11,7 +11,8 @@ import String exposing (join, padLeft)
 
 
 type alias Model =
-    { times : List Int }
+    { times : List Int
+    , loading: Bool }
 
 
 type Msg
@@ -22,16 +23,18 @@ type Msg
 
 init : ( Model, Cmd Msg )
 init =
-    ( Model [], getArrivalTime )
+    ( Model [] True, getArrivalTime )
 
+pad =
+    toString >> padLeft 2 '0'
 
 secondsToMinutes t =
     let
         m =
-            t // 60 |> toString |> padLeft 2 '0'
+            t // 60 |> pad
 
         s =
-            rem t 60 |> toString |> padLeft 2 '0'
+            rem t 60 |> pad
     in
         m ++ "m:" ++ s ++ "s"
 
@@ -51,9 +54,11 @@ view model =
                     )
                     ts
                 )
-            , div [ class "refresh" ]
+            , div
+                [ class "refresh"
+                , disabled model.loading ]
                 [ button [ onClick Refresh ]
-                    [ text "Refresh" ]
+                    [ text (if model.loading then "Loading..." else "Refresh") ]
                 ]
             ]
 
@@ -62,18 +67,14 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         ResultSuccess times ->
-            let
-                ts =
-                    times
-                        |> List.sort
-            in
-                ( { model | times = ts }, Cmd.none )
+            ( { model | times = times |> List.sort
+            , loading = False }, Cmd.none )
 
         ResultFailed err ->
-            ( Model [], Cmd.none )
+            ( { model | loading = False }, Cmd.none )
 
         Refresh ->
-            ( model, getArrivalTime )
+            ( { model | loading = True }, getArrivalTime )
 
 
 getArrivalTime : Cmd Msg
