@@ -1,4 +1,4 @@
-module Main exposing(..)
+module Main exposing (..)
 
 import Html exposing (..)
 import Html.App as Html
@@ -7,42 +7,74 @@ import Html.Events exposing (..)
 import Json.Decode as Json exposing ((:=))
 import Http exposing (get)
 import Task
+import String exposing (join, padLeft)
 
-type Msg =
-    ResultSuccess Int
+
+type alias Model =
+    { times : List Int }
+
+
+type Msg
+    = ResultSuccess (List Int)
     | ResultFailed Http.Error
     | Refresh
 
-init : ( Int, Cmd Msg )
+
+init : ( Model, Cmd Msg )
 init =
-  ( 0, getArrivalTime )
+    ( Model [], getArrivalTime )
 
-view: Int -> Html Msg
+
+secondsToMinutes t =
+    let
+        m =
+            t // 60 |> toString |> padLeft 2 '0'
+
+        s =
+            rem t 60 |> toString |> padLeft 2 '0'
+    in
+        m ++ "m:" ++ s ++ "s"
+
+
+view : Model -> Html Msg
 view model =
-    div
-        [ class "container" ]
-        [ div
-            [ class "minutes" ]
-            [ text (toString model)]
-        , div
-            [ class "refresh" ]
-            [ button
-                [ onClick Refresh ]
-                [ text "Refresh" ]
+    let
+        ts =
+            model.times
+                |> List.map secondsToMinutes
+    in
+        div [ class "container" ]
+            [ div []
+                (List.map
+                    (\t ->
+                        div [ class "minutes" ] [ text t ]
+                    )
+                    ts
+                )
+            , div [ class "refresh" ]
+                [ button [ onClick Refresh ]
+                    [ text "Refresh" ]
+                ]
             ]
-        ]
 
-update : Msg -> Int -> (Int,  Cmd Msg)
+
+update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        ResultSuccess min ->
-            ( min, Cmd.none )
+        ResultSuccess times ->
+            let
+                ts =
+                    times
+                        |> List.sort
+            in
+                ( { model | times = ts }, Cmd.none )
 
         ResultFailed err ->
-            ( 0, Cmd.none )
+            ( Model [], Cmd.none )
 
         Refresh ->
             ( model, getArrivalTime )
+
 
 getArrivalTime : Cmd Msg
 getArrivalTime =
@@ -50,13 +82,10 @@ getArrivalTime =
         |> Task.perform ResultFailed ResultSuccess
 
 
-timeDecoder : Json.Decoder Int
+timeDecoder : Json.Decoder (List Int)
 timeDecoder =
     Json.list ("timeToStation" := Json.int)
-        `Json.andThen` (\l -> l
-            |> List.head
-            |> (Maybe.withDefault 0)
-            |> (\s -> Json.succeed (s // 60)))
+
 
 main =
     Html.program
@@ -65,4 +94,3 @@ main =
         , view = view
         , subscriptions = \m -> Sub.none
         }
-

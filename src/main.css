@@ -6,11 +6,11 @@ body {
 
 .container {
     text-align: center;
-    width:100px;
+    width:300px;
 }
 
 .minutes {
-    font-size: 5em;
+    font-size: 4em;
     font-weight: bold;
     color:#ff0000;
 }
