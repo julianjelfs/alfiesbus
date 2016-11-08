@@ -8,38 +8,46 @@ import Json.Decode as Json exposing ((:=))
 import Http exposing (get)
 import Task
 
+type alias Model =
+    { times: List Int }
+
 type Msg =
-    ResultSuccess Int
+    ResultSuccess (List Int)
     | ResultFailed Http.Error
     | Refresh
 
-init : ( Int, Cmd Msg )
+init : ( Model, Cmd Msg )
 init =
-  ( 0, getArrivalTime )
+  ( Model [], getArrivalTime )
 
-view: Int -> Html Msg
+view: Model -> Html Msg
 view model =
-    div
-        [ class "container" ]
-        [ div
-            [ class "minutes" ]
-            [ text (toString model)]
-        , div
-            [ class "refresh" ]
-            [ button
-                [ onClick Refresh ]
-                [ text "Refresh" ]
+    let
+        t = (model.times
+            |> List.head
+            |> (Maybe.withDefault 0)) // 60
+    in
+        div
+            [ class "container" ]
+            [ div
+                [ class "minutes" ]
+                [ text (toString t)]
+            , div
+                [ class "refresh" ]
+                [ button
+                    [ onClick Refresh ]
+                    [ text "Refresh" ]
+                ]
             ]
-        ]
 
-update : Msg -> Int -> (Int,  Cmd Msg)
+update : Msg -> Model -> (Model,  Cmd Msg)
 update msg model =
     case msg of
-        ResultSuccess min ->
-            ( min, Cmd.none )
+        ResultSuccess times ->
+            ( {model | times = (List.reverse times) }, Cmd.none )
 
         ResultFailed err ->
-            ( 0, Cmd.none )
+            ( Model [], Cmd.none )
 
         Refresh ->
             ( model, getArrivalTime )
@@ -50,13 +58,9 @@ getArrivalTime =
         |> Task.perform ResultFailed ResultSuccess
 
 
-timeDecoder : Json.Decoder Int
+timeDecoder : Json.Decoder (List Int)
 timeDecoder =
     Json.list ("timeToStation" := Json.int)
-        `Json.andThen` (\l -> l
-            |> List.head
-            |> (Maybe.withDefault 0)
-            |> (\s -> Json.succeed (s // 60)))
 
 main =
     Html.program
