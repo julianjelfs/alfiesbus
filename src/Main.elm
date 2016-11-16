@@ -1,11 +1,10 @@
 module Main exposing (..)
 
 import Html exposing (..)
-import Html.App as Html
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
-import Json.Decode as Json exposing ((:=))
-import Http exposing (Error(BadResponse, NetworkError, Timeout, UnexpectedPayload), get)
+import Json.Decode as Json exposing (field)
+import Http exposing (Error(BadUrl, NetworkError, Timeout, BadStatus, BadPayload), send, get)
 import Task
 import String exposing (join, padLeft)
 import Time exposing (every, second)
@@ -18,8 +17,7 @@ type alias Model =
 
 
 type Msg
-    = ResultSuccess (List Int)
-    | ResultFailed Http.Error
+    = ResultReceived (Result Http.Error (List Int))
     | Refresh
 
 
@@ -63,19 +61,20 @@ view model =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        ResultSuccess times ->
+        ResultReceived (Ok times) ->
             ( { model | times = times |> List.sort
             , loading = False
             , error = Nothing }, Cmd.none )
 
-        ResultFailed err ->
+        ResultReceived (Err err) ->
             let
                 errStr =
                     case err of
                         Timeout -> "The service timed out"
                         NetworkError -> "There was some sort of network error"
-                        UnexpectedPayload s -> "There was an unexpected payload of: " ++ s
-                        BadResponse code msg -> "We received a bad response of " ++ (toString code) ++ " from the server with the message: " ++ msg
+                        BadUrl _ -> "There was a bad url error"
+                        BadStatus _ -> "Bad Status Error"
+                        BadPayload _ _ -> "Bad payload error"
             in
             ( { model | loading = False
              , error = errStr |> Just }, Cmd.none )
@@ -86,13 +85,13 @@ update msg model =
 
 getArrivalTime : Cmd Msg
 getArrivalTime =
-    (get timeDecoder "https://api.tfl.gov.uk/StopPoint/490010849S/Arrivals?app_id=da7d2b38&app_key=6e41a466bf61c85ce50712c5622e12d1")
-        |> Task.perform ResultFailed ResultSuccess
+    send ResultReceived
+        <| get "https://api.tfl.gov.uk/StopPoint/490010849S/Arrivals?app_id=da7d2b38&app_key=6e41a466bf61c85ce50712c5622e12d1" timeDecoder
 
 
 timeDecoder : Json.Decoder (List Int)
 timeDecoder =
-    Json.list ("timeToStation" := Json.int)
+    Json.list (field "timeToStation" Json.int)
 
 
 main =
