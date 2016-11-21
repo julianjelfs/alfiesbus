@@ -105,9 +105,13 @@ update msg model =
             ( { model | times = Loading }, getArrivalTime )
 
 
+sortTimes data =
+    RemoteData.map List.sort data
+
+
 getArrivalTime : Cmd Msg
 getArrivalTime =
-    send (ResultReceived << fromResult) <|
+    send (ResultReceived << sortTimes << fromResult) <|
         get "https://api.tfl.gov.uk/StopPoint/490010849S/Arrivals?app_id=da7d2b38&app_key=6e41a466bf61c85ce50712c5622e12d1" timeDecoder
 
 
