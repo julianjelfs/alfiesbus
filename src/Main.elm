@@ -8,25 +8,27 @@ import Http exposing (Error(BadUrl, NetworkError, Timeout, BadStatus, BadPayload
 import Task
 import String exposing (join, padLeft)
 import Time exposing (every, second)
+import RemoteData exposing (..)
 
 
 type alias Model =
-    { times : List Int
-    , loading: Bool
-    , error: Maybe String }
+    { times : WebData (List Int)
+    }
 
 
 type Msg
-    = ResultReceived (Result Http.Error (List Int))
+    = ResultReceived (WebData (List Int))
     | Refresh
 
 
 init : ( Model, Cmd Msg )
 init =
-    ( Model [] True Nothing, getArrivalTime )
+    ( Model Loading, getArrivalTime )
+
 
 pad =
     toString >> padLeft 2 '0'
+
 
 timeToBus t =
     let
@@ -43,50 +45,70 @@ timeToBus t =
 
 view : Model -> Html Msg
 view model =
-    div [ class "container" ]
-        [ div []
-            (List.map timeToBus model.times )
-        , div
-            [ class "refresh"
-            , disabled model.loading ]
-            [ button [ onClick Refresh ]
-                [ text (if model.loading then "Loading..." else "Refresh") ]
+    let
+        ( txt, data, error ) =
+            case model.times of
+                NotAsked ->
+                    ( "Refresh", [], "" )
+
+                Loading ->
+                    ( "Loading", [], "" )
+
+                Failure err ->
+                    ( "Refresh", [], parseError err )
+
+                Success t ->
+                    ( "Refresh", t, "" )
+    in
+        div [ class "container" ]
+            [ div []
+                (List.map timeToBus data)
+            , div
+                [ class "refresh"
+                , disabled (model.times == Loading)
+                ]
+                [ button [ onClick Refresh ]
+                    [ text txt
+                    ]
+                ]
+            , div
+                [ class "error" ]
+                [ text error ]
             ]
-        , div
-            [ class "error" ]
-            [ text (Maybe.withDefault "" model.error) ]
-        ]
+
+
+parseError err =
+    case err of
+        Timeout ->
+            "The service timed out"
+
+        NetworkError ->
+            "There was some sort of network error"
+
+        BadUrl _ ->
+            "There was a bad url error"
+
+        BadStatus _ ->
+            "Bad Status Error"
+
+        BadPayload _ _ ->
+            "Bad payload error"
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        ResultReceived (Ok times) ->
-            ( { model | times = times |> List.sort
-            , loading = False
-            , error = Nothing }, Cmd.none )
-
-        ResultReceived (Err err) ->
-            let
-                errStr =
-                    case err of
-                        Timeout -> "The service timed out"
-                        NetworkError -> "There was some sort of network error"
-                        BadUrl _ -> "There was a bad url error"
-                        BadStatus _ -> "Bad Status Error"
-                        BadPayload _ _ -> "Bad payload error"
-            in
-            ( { model | loading = False
-             , error = errStr |> Just }, Cmd.none )
+        ResultReceived result ->
+            ( { model | times = result }, Cmd.none )
 
         Refresh ->
-            ( { model | loading = True }, getArrivalTime )
+            ( { model | times = Loading }, getArrivalTime )
 
 
 getArrivalTime : Cmd Msg
 getArrivalTime =
-    send ResultReceived
-        <| get "https://api.tfl.gov.uk/StopPoint/490010849S/Arrivals?app_id=da7d2b38&app_key=6e41a466bf61c85ce50712c5622e12d1" timeDecoder
+    send (ResultReceived << fromResult) <|
+        get "https://api.tfl.gov.uk/StopPoint/490010849S/Arrivals?app_id=da7d2b38&app_key=6e41a466bf61c85ce50712c5622e12d1" timeDecoder
 
 
 timeDecoder : Json.Decoder (List Int)
