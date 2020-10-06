@@ -1,0 +1,24 @@
+{
+  "name": "alfiesbus",
+  "version": "1.0.0",
+  "description": "Tell Alfie when his next bus comes",
+  "main": "index.js",
+  "scripts": {
+    "start": "parcel ./src/index.html",
+    "build": "parcel build ./src/index.html"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/julianjelfs/alfiesbus.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/julianjelfs/alfiesbus/issues"
+  },
+  "homepage": "https://julianjelfs.github.io/alfiesbus/dist/index.html",
+  "devDependencies": {
+    "elm-hot": "^1.1.5",
+    "node-elm-compiler": "^5.0.5"
+  }
+}

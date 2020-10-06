@@ -1,14 +1,13 @@
 module Main exposing (..)
 
+import Browser
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
+import Http exposing (Error(..))
 import Json.Decode as Json exposing (field)
-import Http exposing (Error(BadUrl, NetworkError, Timeout, BadStatus, BadPayload), send, get)
-import Task
-import String exposing (join, padLeft)
-import Time exposing (every, second)
 import RemoteData exposing (..)
+import String exposing (padLeft)
 
 
 type alias Model =
@@ -23,11 +22,12 @@ type Msg
 
 init : ( Model, Cmd Msg )
 init =
-    ( Model Loading, getArrivalTime )
+    --( Model Loading, getArrivalTime )
+    ( Model Loading, Cmd.none )
 
 
 pad =
-    toString >> padLeft 2 '0'
+    String.fromInt >> padLeft 2 '0'
 
 
 timeToBus t =
@@ -36,11 +36,11 @@ timeToBus t =
             t // 60 |> pad
 
         s =
-            rem t 60 |> pad
+            remainderBy t 60 |> pad
     in
-        div
-            [ class "minutes" ]
-            [ text (m ++ "m:" ++ s ++ "s") ]
+    div
+        [ class "minutes" ]
+        [ text (m ++ "m:" ++ s ++ "s") ]
 
 
 view : Model -> Html Msg
@@ -60,21 +60,21 @@ view model =
                 Success t ->
                     ( "Refresh", t, "" )
     in
-        div [ class "container" ]
-            [ div []
-                (List.map timeToBus data)
-            , div
-                [ class "refresh"
-                , disabled (model.times == Loading)
-                ]
-                [ button [ onClick Refresh ]
-                    [ text txt
-                    ]
-                ]
-            , div
-                [ class "error" ]
-                [ text error ]
+    div [ class "container" ]
+        [ div []
+            (List.map timeToBus data)
+        , div
+            [ class "refresh"
+            , disabled (model.times == Loading)
             ]
+            [ button [ onClick Refresh ]
+                [ text txt
+                ]
+            ]
+        , div
+            [ class "error" ]
+            [ text error ]
+        ]
 
 
 parseError err =
@@ -91,8 +91,8 @@ parseError err =
         BadStatus _ ->
             "Bad Status Error"
 
-        BadPayload _ _ ->
-            "Bad payload error"
+        BadBody _ ->
+            "Bad body error"
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -111,8 +111,10 @@ sortTimes data =
 
 getArrivalTime : Cmd Msg
 getArrivalTime =
-    send (ResultReceived << sortTimes << fromResult) <|
-        get "https://api.tfl.gov.uk/StopPoint/490010849S/Arrivals?app_id=da7d2b38&app_key=6e41a466bf61c85ce50712c5622e12d1" timeDecoder
+    Http.get
+        { url = "https://api.tfl.gov.uk/StopPoint/490010849S/Arrivals?app_id=da7d2b38&app_key=6e41a466bf61c85ce50712c5622e12d1"
+        , expect = Http.expectJson (RemoteData.fromResult >> ResultReceived) timeDecoder
+        }
 
 
 timeDecoder : Json.Decoder (List Int)
@@ -120,10 +122,11 @@ timeDecoder =
     Json.list (field "timeToStation" Json.int)
 
 
+main : Program () Model Msg
 main =
-    Html.program
-        { init = init
-        , update = update
+    Browser.element
+        { init = \_ -> init
         , view = view
+        , update = update
         , subscriptions = \m -> Sub.none
         }

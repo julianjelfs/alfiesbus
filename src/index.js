@@ -1,11 +1,6 @@
-require('./main.css');
+import { Elm } from './Main.elm';
 
-var Elm = require('./Main.elm');
-
-var root  = document.getElementById('root');
-
-var app = Elm.Main.embed(root);
-
-
-
+const app = Elm.Main.init({
+    node: document.getElementById('root')
+});
 
